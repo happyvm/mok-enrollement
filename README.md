@@ -9,7 +9,7 @@ Script for MOK enrollment on VMware guests, with an additional Hyper-V variant.
 CI runs automatically on GitHub for every pull request and on pushes to `main`, executing:
 
 - Pester tests (`Invoke-Pester -Path ./tests -CI`)
-- PSScriptAnalyzer checks (`Invoke-ScriptAnalyzer -Path ./Invoke-MokDerEnrollment.ps1 -Settings ./PSScriptAnalyzerSettings.psd1 -Recurse`)
+- PSScriptAnalyzer checks on both scripts and tests (`Invoke-ScriptAnalyzer -Path ./Invoke-MokDerEnrollment.ps1,./Invoke-MokDerEnrollment-HyperV.ps1,./tests -Settings ./PSScriptAnalyzerSettings.psd1 -Recurse`)
 
 ### Run unit tests (Pester)
 
@@ -20,7 +20,7 @@ Invoke-Pester -Path ./tests
 ### Run static analysis (PSScriptAnalyzer)
 
 ```powershell
-Invoke-ScriptAnalyzer -Path ./Invoke-MokDerEnrollment.ps1 -Settings ./PSScriptAnalyzerSettings.psd1 -Recurse
+Invoke-ScriptAnalyzer -Path ./Invoke-MokDerEnrollment.ps1,./Invoke-MokDerEnrollment-HyperV.ps1,./tests -Settings ./PSScriptAnalyzerSettings.psd1 -Recurse
 ```
 
 
