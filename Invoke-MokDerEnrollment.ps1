@@ -588,6 +588,7 @@ function Get-PrepareScript {
         [bool]$IsRoot,
         [string]$GuestDestinationQ,
         # Only used when IsRoot = $false
+        [Alias("SudoPasswordB64")]
         [string]$SudoSecretB64
     )
 
