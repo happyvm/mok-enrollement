@@ -546,9 +546,10 @@ function Import-VMList {
     }
 
     $firstLine = $lines[0].Trim().TrimStart([char]0xFEFF)
+    $headerFirstColumn = @($firstLine -split [regex]::Escape([string]$Delimiter), 2)[0].Trim()
 
-    # Detect CSV format by checking for the header "VMName"
-    $isCsv = ($firstLine -eq "VMName") -or ($Path -imatch '\.csv$' -and $firstLine -eq "VMName")
+    # Detect CSV format by checking whether the first column header is "VMName"
+    $isCsv = $headerFirstColumn -eq "VMName"
 
     if ($isCsv) {
         $rows = Import-Csv -LiteralPath $Path -Delimiter $Delimiter

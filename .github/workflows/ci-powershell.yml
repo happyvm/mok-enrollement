@@ -26,5 +26,6 @@ jobs:
         run: Invoke-Pester -Path ./tests -CI
 
       - name: Run static analysis (PSScriptAnalyzer)
+        if: always()
         shell: pwsh
-        run: Invoke-ScriptAnalyzer -Path ./Invoke-MokDerEnrollment.ps1 -Settings ./PSScriptAnalyzerSettings.psd1 -Recurse
+        run: Invoke-ScriptAnalyzer -Path ./Invoke-MokDerEnrollment.ps1 -Settings ./PSScriptAnalyzerSettings.psd1 -Recurse -EnableExit
