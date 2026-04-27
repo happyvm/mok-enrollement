@@ -12,6 +12,18 @@ Describe 'ConvertTo-BashLiteral' {
     }
 }
 
+Describe 'Get-Base64Utf8AndClear' {
+    It 'returns base64 UTF-8 content' {
+        $value = Get-Base64Utf8AndClear -PlainText 'mok123'
+        $value | Should -Be 'bW9rMTIz'
+    }
+
+    It 'supports empty values' {
+        $value = Get-Base64Utf8AndClear -PlainText ''
+        $value | Should -Be ''
+    }
+}
+
 Describe 'Expand-Template' {
     It 'replaces all template placeholders' {
         $expanded = Expand-Template -Template 'hello __NAME__, id=__ID__' -Values @{ NAME = 'mok'; ID = 42 }
@@ -79,5 +91,54 @@ Describe 'Get-PrepareScript' {
         $scriptText = Get-PrepareScript -IsRoot $false -GuestDestinationQ "'/tmp/mok'" -SudoPasswordB64 'YWJj'
         $scriptText | Should -Match 'sudo -S'
         $scriptText | Should -Match 'YWJj'
+    }
+}
+
+Describe 'Get-ImportScript' {
+    It 'builds non-root script with sudo helper and hash file' {
+        $scriptText = Get-ImportScript `
+            -IsRoot $false `
+            -MokSecretB64 'bW9r' `
+            -SudoSecretB64 'c3Vkbw==' `
+            -GuestCertListQ "'/tmp/mok/a.der' '/tmp/mok/b.der'" `
+            -HashFileQ "'/tmp/mok/hash.txt'"
+
+        $scriptText | Should -Match '_sudo\(\)'
+        $scriptText | Should -Match '--hash-file'
+        $scriptText | Should -Match "'/tmp/mok/hash.txt'"
+    }
+
+    It 'builds root script without sudo helper' {
+        $scriptText = Get-ImportScript `
+            -IsRoot $true `
+            -MokSecretB64 'bW9r' `
+            -SudoSecretB64 'unused' `
+            -GuestCertListQ "'/tmp/mok/a.der'" `
+            -HashFileQ "'/tmp/mok/hash.txt'"
+
+        $scriptText | Should -Not -Match '_sudo\(\)'
+        $scriptText | Should -Not -Match 'sudo -S'
+    }
+}
+
+Describe 'Get-VerifyScript' {
+    It 'builds non-root verification script with sudo helper' {
+        $scriptText = Get-VerifyScript `
+            -IsRoot $false `
+            -SudoSecretB64 'c3Vkbw==' `
+            -GuestCertListQ "'/tmp/mok/a.der'"
+
+        $scriptText | Should -Match '_sudo\(\)'
+        $scriptText | Should -Match '--list-enrolled'
+    }
+
+    It 'builds root verification script without sudo helper' {
+        $scriptText = Get-VerifyScript `
+            -IsRoot $true `
+            -SudoSecretB64 'unused' `
+            -GuestCertListQ "'/tmp/mok/a.der'"
+
+        $scriptText | Should -Not -Match '_sudo\(\)'
+        $scriptText | Should -Not -Match 'sudo -S'
     }
 }
