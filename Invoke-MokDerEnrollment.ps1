@@ -633,8 +633,7 @@ function Get-ImportScript {
         [string]$MokPasswordB64,
         [string]$SudoPasswordB64,
         [string]$GuestCertListQ,
-        [string]$HashFileQ,
-        [string]$GuestDestinationQ
+        [string]$HashFileQ
     )
 
     if ($IsRoot) {
@@ -965,8 +964,7 @@ function Invoke-MokDerEnrollmentForVm {
         -MokPasswordB64 $mokB64 `
         -SudoPasswordB64 $guestPasswordB64 `
         -GuestCertListQ $guestCertListQ `
-        -HashFileQ $hashFileQ `
-        -GuestDestinationQ $guestDestQ
+        -HashFileQ $hashFileQ
 
     # Zero the B64 copies now that the scripts are built
     $mokB64          = $null
