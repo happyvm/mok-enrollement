@@ -253,7 +253,7 @@ function Read-MokPassword {
 # USB HID / MOKManager helpers
 # ---------------------------------------------------------------------------
 
-function New-UsbHidKeyEvent {
+function Get-UsbHidKeyEvent {
     param(
         [Parameter(Mandatory = $true)]
         [int]$UsageId
@@ -310,7 +310,7 @@ function Send-SpecialKey {
     }
 
     for ($i = 0; $i -lt $Count; $i++) {
-        $event = New-UsbHidKeyEvent -UsageId $specialKeys[$Key]
+        $event = Get-UsbHidKeyEvent -UsageId $specialKeys[$Key]
         Send-UsbHidEvent -VmView $VmView -KeyEvent $event
     }
 }
@@ -346,12 +346,12 @@ function Send-Text {
             throw "Unsupported character in MOK password: '$s'"
         }
 
-        $event = New-UsbHidKeyEvent -UsageId $usageId
+        $event = Get-UsbHidKeyEvent -UsageId $usageId
         Send-UsbHidEvent -VmView $VmView -KeyEvent $event
     }
 }
 
-function Catch-MokManagerPrompt {
+function Wait-MokManagerPrompt {
     param(
         [Parameter(Mandatory = $true)]
         $VmView,
@@ -588,7 +588,7 @@ function Get-PrepareScript {
         [bool]$IsRoot,
         [string]$GuestDestinationQ,
         # Only used when IsRoot = $false
-        [string]$SudoPasswordB64
+        [string]$SudoSecretB64
     )
 
     if ($IsRoot) {
@@ -614,7 +614,7 @@ chmod 700 "$DEST"
 unset SUDO_PASSWORD
 echo "Directory ready: $DEST"
 '@ -Values @{
-        SUDO_B64 = $SudoPasswordB64
+        SUDO_B64 = $SudoSecretB64
         DEST     = $GuestDestinationQ
     }
 }
@@ -630,8 +630,8 @@ function Get-ImportScript {
     #>
     param(
         [bool]$IsRoot,
-        [string]$MokPasswordB64,
-        [string]$SudoPasswordB64,
+        [string]$MokSecretB64,
+        [string]$SudoSecretB64,
         [string]$GuestCertListQ,
         [string]$HashFileQ
     )
@@ -701,8 +701,8 @@ __SUDO_PREFIX__mokutil --list-new || true
 echo ""
 echo "MOK import prepared. Final enrollment will happen at reboot in MOKManager."
 '@ -Values @{
-        MOK_B64     = $MokPasswordB64
-        SUDO_B64    = $SudoPasswordB64
+        MOK_B64     = $MokSecretB64
+        SUDO_B64    = $SudoSecretB64
         SUDO_SETUP  = $sudoSetupBlock
         SUDO_PREFIX = $sudoPrefix
         CERT_LIST   = $GuestCertListQ
@@ -713,7 +713,7 @@ echo "MOK import prepared. Final enrollment will happen at reboot in MOKManager.
 function Get-VerifyScript {
     param(
         [bool]$IsRoot,
-        [string]$SudoPasswordB64,
+        [string]$SudoSecretB64,
         [string]$GuestCertListQ
     )
 
@@ -750,7 +750,7 @@ echo ""
 echo "=== Enrolled MOK keys (first 120 lines) ==="
 __SUDO_PREFIX__mokutil --list-enrolled | head -n 120 || true
 '@ -Values @{
-        SUDO_B64    = $SudoPasswordB64
+        SUDO_B64    = $SudoSecretB64
         SUDO_SETUP  = $sudoSetupBlock
         SUDO_PREFIX = $sudoPrefix
         CERT_LIST   = $GuestCertListQ
@@ -871,7 +871,7 @@ function Invoke-MokDerEnrollmentForVm {
     $prepareScript = Get-PrepareScript `
         -IsRoot $IsRoot `
         -GuestDestinationQ $guestDestQ `
-        -SudoPasswordB64 $guestPasswordB64
+        -SudoSecretB64 $guestPasswordB64
 
     Invoke-GuestBash -VM $vm -GuestCredential $GuestCredential -ScriptText $prepareScript | Out-Null
 
@@ -961,8 +961,8 @@ function Invoke-MokDerEnrollmentForVm {
 
     $importScript = Get-ImportScript `
         -IsRoot $IsRoot `
-        -MokPasswordB64 $mokB64 `
-        -SudoPasswordB64 $guestPasswordB64 `
+        -MokSecretB64 $mokB64 `
+        -SudoSecretB64 $guestPasswordB64 `
         -GuestCertListQ $guestCertListQ `
         -HashFileQ $hashFileQ
 
@@ -993,7 +993,7 @@ function Invoke-MokDerEnrollmentForVm {
 
     # Wait until VMware Tools reports as not running, which confirms the guest
     # has actually started its shutdown/reboot sequence.
-    # Without this, Catch-MokManagerPrompt could fire before the reboot even begins.
+    # Without this, Wait-MokManagerPrompt could fire before the reboot even begins.
     Write-Host "[$TargetVMName] Waiting for VMware Tools to disconnect (reboot confirmation)..."
     $toolsDisconnectDeadline = (Get-Date).AddSeconds(120)
     $toolsDisconnected = $false
@@ -1024,7 +1024,7 @@ function Invoke-MokDerEnrollmentForVm {
         # Refresh the view object — it was captured before the reboot and may be stale.
         $vmView = Get-View -Id $vm.Id
 
-        Catch-MokManagerPrompt `
+        Wait-MokManagerPrompt `
             -VmView $vmView `
             -DurationSeconds $TargetCatchDurationSeconds `
             -IntervalMs $TargetCatchIntervalMs
@@ -1061,7 +1061,7 @@ function Invoke-MokDerEnrollmentForVm {
 
     $verifyScript = Get-VerifyScript `
         -IsRoot $IsRoot `
-        -SudoPasswordB64 $guestPasswordB642 `
+        -SudoSecretB64 $guestPasswordB642 `
         -GuestCertListQ $guestCertListQ
 
     $guestPasswordB642 = $null

@@ -5,7 +5,6 @@
         'PSAvoidUsingPlainTextForPassword',
         'PSAvoidUsingWMICmdlet',
         'PSMisleadingBacktick',
-        'PSProvideCommentHelp',
         'PSUseApprovedVerbs',
         'PSUseDeclaredVarsMoreThanAssignments',
         'PSUseLiteralInitializerForHashtable',
@@ -16,12 +15,5 @@
         'PSReviewUnusedParameter'
     )
 
-    Rules = @{
-        PSProvideCommentHelp = @{
-            ExportedOnly = $false
-            BlockComment  = $true
-            VSCodeSnippetCorrection = $false
-            Placement = 'before'
-        }
-    }
+    Rules = @{}
 }
