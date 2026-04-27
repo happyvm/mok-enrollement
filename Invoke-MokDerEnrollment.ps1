@@ -101,7 +101,13 @@ param(
     [switch]$ContinueOnError
 )
 
-Import-Module VMware.PowerCLI -ErrorAction Stop
+# ---------------------------------------------------------------------------
+# Runtime prerequisites
+# ---------------------------------------------------------------------------
+
+function Initialize-MokDerEnrollmentEnvironment {
+    Import-Module VMware.PowerCLI -ErrorAction Stop
+}
 
 # ---------------------------------------------------------------------------
 # Security helpers
@@ -1078,136 +1084,144 @@ function Invoke-MokDerEnrollmentForVm {
 # Entry point
 # ---------------------------------------------------------------------------
 
-# Resolve and validate DER files once for all VMs
-$localDerFiles = Get-DerFiles -Folder $DerFolder
+function Invoke-MokDerEnrollmentMain {
+    Initialize-MokDerEnrollmentEnvironment
 
-Write-Host "Found $($localDerFiles.Count) .der file(s) in $DerFolder :"
-$localDerFiles | ForEach-Object { Write-Host "  $_" }
+    # Resolve and validate DER files once for all VMs
+    $localDerFiles = Get-DerFiles -Folder $DerFolder
 
-# Build VM work list
-if ($CsvPath) {
-    $vmList = Import-VMList -Path $CsvPath -Delimiter $CsvDelimiter
+    Write-Host "Found $($localDerFiles.Count) .der file(s) in $DerFolder :"
+    $localDerFiles | ForEach-Object { Write-Host "  $_" }
 
-    if (-not $vmList -or $vmList.Count -eq 0) {
-        throw "No VM found in CSV/list file: $CsvPath"
-    }
+    # Build VM work list
+    if ($CsvPath) {
+        $vmList = Import-VMList -Path $CsvPath -Delimiter $CsvDelimiter
 
-    $workItems = @($vmList | ForEach-Object { [pscustomobject]@{ VMName = $_.VMName } })
-}
-else {
-    if (-not $VMName) {
-        throw "Single VM mode requires -VMName. Batch mode requires -CsvPath."
-    }
-
-    $workItems = @([pscustomobject]@{ VMName = $VMName })
-}
-
-# Prompt for MOK password — stored as SecureString for the lifetime of the script
-$mokPasswordSecure = Read-MokPassword
-
-Write-Host "Connecting to vCenter: $vCenter"
-$vCenterCredential = Get-Credential -Message "vCenter credential"
-Connect-VIServer -Server $vCenter -Credential $vCenterCredential -ErrorAction Stop | Out-Null
-
-$sharedGuestCredential = $null
-
-if (-not $PromptGuestCredentialPerVM) {
-    $sharedGuestCredential = Get-Credential -Message "Guest OS credential. Root recommended; otherwise sudo must be available."
-}
-
-$results = @()
-
-foreach ($item in $workItems) {
-    $targetVmName = "$($item.VMName)".Trim()
-
-    if (-not $targetVmName) {
-        $msg = "Empty VM name found in list."
-        $results += [pscustomobject]@{
-            VMName     = ""
-            DerCount   = $localDerFiles.Count
-            Status     = "Failed"
-            Message    = $msg
-            StartedAt  = Get-Date
-            FinishedAt = Get-Date
+        if (-not $vmList -or $vmList.Count -eq 0) {
+            throw "No VM found in CSV/list file: $CsvPath"
         }
 
-        if (-not $ContinueOnError) { throw $msg }
-        continue
-    }
-
-    $guestCredential = if ($PromptGuestCredentialPerVM) {
-        Get-Credential -Message "Guest OS credential for VM: $targetVmName"
+        $workItems = @($vmList | ForEach-Object { [pscustomobject]@{ VMName = $_.VMName } })
     }
     else {
-        $sharedGuestCredential
-    }
-
-    # Determine at call site whether this credential is root
-    $isRoot = $GuestCredentialIsRoot.IsPresent -or ($guestCredential.UserName -eq "root")
-
-    try {
-        $result = Invoke-MokDerEnrollmentForVm `
-            -TargetVMName               $targetVmName `
-            -LocalDerFiles              $localDerFiles `
-            -TargetGuestDestination     $GuestDestination `
-            -TargetMokAutomationMode    $MokAutomationMode `
-            -TargetCatchDurationSeconds $CatchDurationSeconds `
-            -TargetCatchIntervalMs      $CatchIntervalMs `
-            -TargetCopyTimeoutSeconds   $CopyTimeoutSeconds `
-            -TargetVCenter              $vCenter `
-            -VCenterCredential          $vCenterCredential `
-            -GuestCredential            $guestCredential `
-            -MokPasswordSecure          $mokPasswordSecure `
-            -IsRoot                     $isRoot
-
-        $results += $result
-    }
-    catch {
-        $errorMessage = $_.Exception.Message
-
-        Write-Host ""
-        Write-Host "ERROR while processing VM: $targetVmName"
-        Write-Host $errorMessage
-
-        $results += [pscustomobject]@{
-            VMName     = $targetVmName
-            DerCount   = $localDerFiles.Count
-            Status     = "Failed"
-            Message    = $errorMessage
-            StartedAt  = Get-Date
-            FinishedAt = Get-Date
+        if (-not $VMName) {
+            throw "Single VM mode requires -VMName. Batch mode requires -CsvPath."
         }
 
-        if (-not $ContinueOnError) { break }
+        $workItems = @([pscustomobject]@{ VMName = $VMName })
+    }
+
+    # Prompt for MOK password — stored as SecureString for the lifetime of the script
+    $mokPasswordSecure = Read-MokPassword
+
+    Write-Host "Connecting to vCenter: $vCenter"
+    $vCenterCredential = Get-Credential -Message "vCenter credential"
+    Connect-VIServer -Server $vCenter -Credential $vCenterCredential -ErrorAction Stop | Out-Null
+
+    $sharedGuestCredential = $null
+
+    if (-not $PromptGuestCredentialPerVM) {
+        $sharedGuestCredential = Get-Credential -Message "Guest OS credential. Root recommended; otherwise sudo must be available."
+    }
+
+    $results = @()
+
+    foreach ($item in $workItems) {
+        $targetVmName = "$($item.VMName)".Trim()
+
+        if (-not $targetVmName) {
+            $msg = "Empty VM name found in list."
+            $results += [pscustomobject]@{
+                VMName     = ""
+                DerCount   = $localDerFiles.Count
+                Status     = "Failed"
+                Message    = $msg
+                StartedAt  = Get-Date
+                FinishedAt = Get-Date
+            }
+
+            if (-not $ContinueOnError) { throw $msg }
+            continue
+        }
+
+        $guestCredential = if ($PromptGuestCredentialPerVM) {
+            Get-Credential -Message "Guest OS credential for VM: $targetVmName"
+        }
+        else {
+            $sharedGuestCredential
+        }
+
+        # Determine at call site whether this credential is root
+        $isRoot = $GuestCredentialIsRoot.IsPresent -or ($guestCredential.UserName -eq "root")
+
+        try {
+            $result = Invoke-MokDerEnrollmentForVm `
+                -TargetVMName               $targetVmName `
+                -LocalDerFiles              $localDerFiles `
+                -TargetGuestDestination     $GuestDestination `
+                -TargetMokAutomationMode    $MokAutomationMode `
+                -TargetCatchDurationSeconds $CatchDurationSeconds `
+                -TargetCatchIntervalMs      $CatchIntervalMs `
+                -TargetCopyTimeoutSeconds   $CopyTimeoutSeconds `
+                -TargetVCenter              $vCenter `
+                -VCenterCredential          $vCenterCredential `
+                -GuestCredential            $guestCredential `
+                -MokPasswordSecure          $mokPasswordSecure `
+                -IsRoot                     $isRoot
+
+            $results += $result
+        }
+        catch {
+            $errorMessage = $_.Exception.Message
+
+            Write-Host ""
+            Write-Host "ERROR while processing VM: $targetVmName"
+            Write-Host $errorMessage
+
+            $results += [pscustomobject]@{
+                VMName     = $targetVmName
+                DerCount   = $localDerFiles.Count
+                Status     = "Failed"
+                Message    = $errorMessage
+                StartedAt  = Get-Date
+                FinishedAt = Get-Date
+            }
+
+            if (-not $ContinueOnError) { break }
+        }
+    }
+
+    # Zero the MOK SecureString
+    $mokPasswordSecure = $null
+
+    # Add duration column to results
+    $results = $results | ForEach-Object {
+        $_ | Add-Member -NotePropertyName DurationSeconds `
+                        -NotePropertyValue ([int]($_.FinishedAt - $_.StartedAt).TotalSeconds) `
+                        -PassThru
+    }
+
+    if ($ReportCsvPath) {
+        $results | Export-Csv `
+            -LiteralPath $ReportCsvPath `
+            -Delimiter $CsvDelimiter `
+            -NoTypeInformation `
+            -Encoding UTF8
+
+        Write-Host "Report written to: $ReportCsvPath"
+    }
+
+    # Return the result objects to the pipeline so callers can process them.
+    # Display a formatted summary only when running interactively.
+    $results
+
+    if ($Host.UI.RawUI -and [Environment]::UserInteractive) {
+        Write-Host ""
+        Write-Host "Summary:"
+        $results | Format-Table -AutoSize
     }
 }
 
-# Zero the MOK SecureString
-$mokPasswordSecure = $null
-
-# Add duration column to results
-$results = $results | ForEach-Object {
-    $_ | Add-Member -NotePropertyName DurationSeconds `
-                    -NotePropertyValue ([int]($_.FinishedAt - $_.StartedAt).TotalSeconds) `
-                    -PassThru
-}
-
-if ($ReportCsvPath) {
-    $results | Export-Csv `
-        -LiteralPath $ReportCsvPath `
-        -Delimiter $CsvDelimiter `
-        -NoTypeInformation `
-        -Encoding UTF8
-
-    Write-Host "Report written to: $ReportCsvPath"
-}
-
-# Return the result objects to the pipeline so callers can process them.
-# Display a formatted summary only when running interactively.
-$results
-
-if ($Host.UI.RawUI -and [Environment]::UserInteractive) {
-    Write-Host ""
-    Write-Host "Summary:"
-    $results | Format-Table -AutoSize
+if ($MyInvocation.InvocationName -ne '.') {
+    Invoke-MokDerEnrollmentMain
 }
