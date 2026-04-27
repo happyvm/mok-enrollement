@@ -28,4 +28,10 @@ jobs:
       - name: Run static analysis (PSScriptAnalyzer)
         if: always()
         shell: pwsh
-        run: Invoke-ScriptAnalyzer -Path ./Invoke-MokDerEnrollment.ps1 -Settings ./PSScriptAnalyzerSettings.psd1 -Recurse -EnableExit
+        run: |
+          $paths = @(
+            './Invoke-MokDerEnrollment.ps1',
+            './Invoke-MokDerEnrollment-HyperV.ps1',
+            './tests'
+          )
+          Invoke-ScriptAnalyzer -Path $paths -Settings ./PSScriptAnalyzerSettings.psd1 -Recurse -EnableExit
