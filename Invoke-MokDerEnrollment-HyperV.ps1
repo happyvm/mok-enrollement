@@ -50,7 +50,7 @@ $ErrorActionPreference = 'Stop'
 
 function ConvertTo-BashLiteral {
     param([Parameter(Mandatory = $true)][string]$Text)
-    "'" + $Text.Replace("'", "'\\''") + "'"
+    "'" + $Text.Replace("'", "'\''") + "'"
 }
 
 function Get-DerFiles {

@@ -953,12 +953,14 @@ function Invoke-MokDerEnrollmentForVm {
             throw "[$TargetVMName] Copy of '$label' timed out after $TargetCopyTimeoutSeconds seconds. VMware Tools may be unresponsive."
         }
 
-        # Propagate any error that occurred inside the job
-        $jobError = $copyJob.ChildJobs[0].Error
+        # Snapshot errors into a new array before removing the job.
+        # Remove-Job -Force disposes the job's PSDataCollection, which clears
+        # ChildJobs[0].Error in-place — checking Count after removal always yields 0.
+        $jobErrors = @($copyJob.ChildJobs[0].Error)
         Remove-Job -Job $copyJob -Force
 
-        if ($jobError -and $jobError.Count -gt 0) {
-            throw "[$TargetVMName] Copy of '$label' failed: $($jobError[0].Exception.Message)"
+        if ($jobErrors.Count -gt 0) {
+            throw "[$TargetVMName] Copy of '$label' failed: $($jobErrors[0].Exception.Message)"
         }
 
         Write-Host "[$TargetVMName] $label copied successfully."
