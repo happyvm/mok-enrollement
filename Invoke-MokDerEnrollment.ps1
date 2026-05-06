@@ -91,7 +91,7 @@ param(
     [int]$GuestReadyTimeoutSeconds = 900,
 
     # Timeout in seconds for each individual DER file copy via VMware Tools
-    [int]$CopyTimeoutSeconds = 120,
+    [int]$CopyTimeoutSeconds = 300,
 
     # If the guest credential is root, sudo is never called
     [switch]$GuestCredentialIsRoot,
