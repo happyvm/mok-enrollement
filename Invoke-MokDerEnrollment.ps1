@@ -452,11 +452,19 @@ function Invoke-GuestBash {
         [int]$ToolsWaitSecs = 120
     )
 
+    # VMware Guest Operations may flatten multiline scripts into a single
+    # command separated by ';'. Blank lines can become ';;', which Bash parses
+    # as an unexpected token outside of a case statement.
+    # Remove empty/whitespace-only lines before execution to avoid generating
+    # accidental ';;' sequences.
+    $sanitizedScript = (($ScriptText -split "`r?`n") |
+        Where-Object { $_ -notmatch '^\s*$' }) -join "`n"
+
     $result = Invoke-VMScript `
         -VM $VM `
         -GuestCredential $GuestCredential `
         -ScriptType Bash `
-        -ScriptText $ScriptText `
+        -ScriptText $sanitizedScript `
         -ToolsWaitSecs $ToolsWaitSecs `
         -ErrorAction Stop
 
