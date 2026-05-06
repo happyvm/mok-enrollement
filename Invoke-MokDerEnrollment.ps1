@@ -98,7 +98,10 @@ param(
 
     [switch]$PromptGuestCredentialPerVM,
 
-    [switch]$ContinueOnError
+    [switch]$ContinueOnError,
+
+    # Skip uploading local DER files; assumes they already exist in -GuestDestination
+    [switch]$BypassCertUpload
 )
 
 # ---------------------------------------------------------------------------
@@ -802,7 +805,9 @@ function Invoke-MokDerEnrollmentForVm {
         [Parameter(Mandatory = $true)]
         [securestring]$MokPasswordSecure,
 
-        [bool]$IsRoot
+        [bool]$IsRoot,
+
+        [bool]$SkipCertUpload
     )
 
     $startedAt = Get-Date
@@ -879,7 +884,11 @@ function Invoke-MokDerEnrollmentForVm {
     # -----------------------------------------------------------------------
     # Step 2 — Copy DER files (with per-file timeout via background job)
     # -----------------------------------------------------------------------
-    for ($i = 0; $i -lt $LocalDerFiles.Count; $i++) {
+    if ($SkipCertUpload) {
+        Write-Host "[$TargetVMName] Skipping DER upload (-BypassCertUpload enabled). Assuming cert files already exist in: $TargetGuestDestination"
+    }
+    else {
+        for ($i = 0; $i -lt $LocalDerFiles.Count; $i++) {
         $localFile = $LocalDerFiles[$i]
         $guestDest = $guestDerPaths[$i]
         $label     = "mok-key-{0:D3}.der" -f ($i + 1)
@@ -953,6 +962,7 @@ function Invoke-MokDerEnrollmentForVm {
         }
 
         Write-Host "[$TargetVMName] $label copied successfully."
+        }
     }
 
     # -----------------------------------------------------------------------
@@ -1167,7 +1177,8 @@ function Invoke-MokDerEnrollmentMain {
                 -VCenterCredential          $vCenterCredential `
                 -GuestCredential            $guestCredential `
                 -MokPasswordSecure          $mokPasswordSecure `
-                -IsRoot                     $isRoot
+                -IsRoot                     $isRoot `
+                -SkipCertUpload             $BypassCertUpload.IsPresent
 
             $results += $result
         }
