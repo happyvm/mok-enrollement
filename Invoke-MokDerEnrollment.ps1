@@ -676,7 +676,9 @@ _cleanup() { rm -f "$HASH_FILE"; unset MOK_PASSWORD SUDO_PASSWORD; }
 trap _cleanup EXIT
 
 echo "=== mokutil version ==="
-mokutil --version
+# Some mokutil builds print version but still return non-zero (seen on 0.6.0).
+# Do not abort the whole enrollment pre-check on this informational command.
+mokutil --version || true
 
 echo ""
 echo "=== Secure Boot state ==="
