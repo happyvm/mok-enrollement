@@ -84,7 +84,10 @@ function Get-OptionalSshKeyArgs {
 }
 
 function Invoke-GuestSsh {
-    param([Parameter(Mandatory = $true)][string]$RemoteCommand)
+    param(
+        [Parameter(Mandatory = $true)][string]$RemoteCommand,
+        [switch]$AllocateTty
+    )
 
     $sshKeyArgs = Get-OptionalSshKeyArgs
     $target = "$GuestUser@$GuestAddress"
@@ -92,6 +95,10 @@ function Invoke-GuestSsh {
     $sshArgs = @('-o', 'StrictHostKeyChecking=accept-new') +
                $sshKeyArgs +
                @($target, $RemoteCommand)
+
+    if ($AllocateTty) {
+        $sshArgs = @('-tt') + $sshArgs
+    }
 
     & ssh @sshArgs
     if ($LASTEXITCODE -ne 0) {
@@ -186,8 +193,8 @@ function Invoke-MokImport {
     param([Parameter(Mandatory = $true)][string[]]$DerFiles)
 
     $destQ = ConvertTo-BashLiteral -Text $GuestDestination
-    $importLine = "for f in $destQ/*.der; do mokutil --import \"`$f\"; done"
-    Invoke-GuestSsh -RemoteCommand $importLine
+    $importLine = "set -- $destQ/*.der; mokutil --import ""`$@"""
+    Invoke-GuestSsh -RemoteCommand $importLine -AllocateTty
 }
 
 $derFiles = Get-DerFiles -Folder $DerFolder
