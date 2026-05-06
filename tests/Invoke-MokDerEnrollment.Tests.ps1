@@ -119,6 +119,17 @@ Describe 'Get-ImportScript' {
         $scriptText | Should -Not -Match '_sudo\(\)'
         $scriptText | Should -Not -Match 'sudo -S'
     }
+
+    It 'does not fail when mokutil version command returns non-zero' {
+        $scriptText = Get-ImportScript `
+            -IsRoot $true `
+            -MokSecretB64 'bW9r' `
+            -SudoSecretB64 'unused' `
+            -GuestCertListQ "'/tmp/mok/a.der'" `
+            -HashFileQ "'/tmp/mok/hash.txt'"
+
+        $scriptText | Should -Match 'mokutil --version \|\| true'
+    }
 }
 
 Describe 'Get-VerifyScript' {
