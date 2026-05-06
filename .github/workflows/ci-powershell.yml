@@ -28,4 +28,20 @@ jobs:
       - name: Run static analysis (PSScriptAnalyzer)
         if: always()
         shell: pwsh
-        run: Invoke-ScriptAnalyzer -Path './Invoke-MokDerEnrollment.ps1','./Invoke-MokDerEnrollment-HyperV.ps1','./tests' -Settings ./PSScriptAnalyzerSettings.psd1 -Recurse -EnableExit
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $settingsPath = './PSScriptAnalyzerSettings.psd1'
+          $analysisTargets = @(
+            './Invoke-MokDerEnrollment.ps1'
+            './Invoke-MokDerEnrollment-HyperV.ps1'
+            './tests'
+          )
+
+          $issues = foreach ($target in $analysisTargets) {
+            Invoke-ScriptAnalyzer -Path $target -Settings $settingsPath -Recurse
+          }
+
+          if ($issues) {
+            $issues | Format-Table -AutoSize
+            exit 1
+          }
